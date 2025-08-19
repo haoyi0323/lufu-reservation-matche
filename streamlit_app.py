@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import re
 import os
@@ -14,15 +14,127 @@ class ReservationMatcherWeb:
         self.reservation_file = None
         self.merged_df = pd.DataFrame()
         self.original_df = pd.DataFrame()
+    
+    def process_new_format_reservation(self, df):
+        """处理新格式的预定表（8月预定.xls格式）"""
+        if df.empty:
+            return df
+            
+        # 检测是否为新格式：第一行包含'包厢'和日期信息，且有很多Unnamed列
+        first_row = df.iloc[0] if len(df) > 0 else pd.Series()
+        unnamed_cols = [col for col in df.columns if 'Unnamed' in str(col)]
+        
+        # 新格式特征：第一行有'包厢'，且有多个Unnamed列
+        is_new_format = (
+            len(unnamed_cols) >= 5 and 
+            len(df) > 0 and 
+            pd.notna(first_row.iloc[0]) and 
+            str(first_row.iloc[0]) == '包厢'
+        )
+        
+        if is_new_format:
+            # 处理新格式
+            # 跳过第0行（表头行），从第1行开始读取数据
+            data_df = df.iloc[1:].copy()
+            
+            # 重新定义列名
+            new_columns = {
+                0: '包厢',
+                1: '市别', 
+                2: '预订时间',
+                3: '姓名',
+                4: '人数',
+                5: '联系电话',
+                6: '预订人',
+                7: '经手人',
+                8: '备注'
+            }
+            
+            # 重命名列
+            column_mapping = {}
+            for i, col in enumerate(data_df.columns):
+                if i in new_columns:
+                    column_mapping[col] = new_columns[i]
+            
+            data_df = data_df.rename(columns=column_mapping)
+            
+            # 过滤掉空行和无效数据
+            data_df = data_df[data_df['包厢'].notna()]
+            data_df = data_df[data_df['包厢'] != '晚市']  # 过滤掉分隔行
+            
+            # 过滤掉总结行（包含"合计"的行）
+            data_df = data_df[~data_df['包厢'].astype(str).str.contains('合计', na=False)]
+            data_df = data_df[~data_df['包厢'].astype(str).str.contains('总计', na=False)]
+            data_df = data_df[~data_df['包厢'].astype(str).str.contains('小计', na=False)]
+            
+            # 从表头行提取日期信息
+            header_info = first_row.iloc[1] if len(first_row) > 1 else None
+            if pd.notna(header_info) and '月' in str(header_info):
+                # 解析日期信息，如"8月1号 星期五"
+                date_str = str(header_info)
+                try:
+                    # 提取月份和日期
+                    import re
+                    match = re.search(r'(\d+)月(\d+)号', date_str)
+                    if match:
+                        month = int(match.group(1))
+                        day = int(match.group(2))
+                        # 假设是当前年份
+                        current_year = datetime.now().year
+                        date_obj = datetime(current_year, month, day)
+                        data_df['日期'] = date_obj
+                except:
+                    # 如果解析失败，使用当前日期
+                    data_df['日期'] = datetime.now().date()
+            else:
+                data_df['日期'] = datetime.now().date()
+            
+            # 处理预订时间字段（新格式中可能是time对象）
+            if '预订时间' in data_df.columns:
+                def convert_time_format(time_val):
+                    if pd.isna(time_val):
+                        return None
+                    try:
+                        # 如果是time对象，转换为字符串
+                        if hasattr(time_val, 'strftime'):
+                            return time_val.strftime('%H:%M')
+                        # 如果是字符串，直接返回
+                        elif isinstance(time_val, str):
+                            return time_val
+                        # 其他情况转换为字符串
+                        else:
+                            return str(time_val)
+                    except:
+                        return str(time_val) if time_val is not None else None
+                
+                data_df['预订时间'] = data_df['预订时间'].apply(convert_time_format)
+            
+            return data_df
+        else:
+            # 原格式，直接返回
+            return df
         
     def smart_table_match(self, reservation_table, meituan_table):
-        """智能桌牌号匹配函数"""
+        """智能桌牌号匹配函数 - 支持新格式包厢名称"""
         # 提取数字部分
         def extract_numbers(table_str):
             if pd.isna(table_str):
                 return None
             numbers = re.findall(r'\d+', str(table_str))
             return ''.join(numbers) if numbers else None
+        
+        # 提取包厢名称关键词
+        def extract_room_keywords(table_str):
+            if pd.isna(table_str):
+                return set()
+            table_str = str(table_str).lower()
+            # 新格式包厢关键词
+            room_keywords = ['福禄', '喜乐', '大厅', '包厢', '雅间']
+            found_keywords = set()
+            for keyword in room_keywords:
+                if keyword in table_str:
+                    found_keywords.add(keyword)
+            return found_keywords
         
         # 判断是否为外卖订单
         def is_takeout(table_str):
@@ -36,10 +148,22 @@ class ReservationMatcherWeb:
         if str(reservation_table) == str(meituan_table):
             return True, "完全匹配"
         
-        # 数字部分匹配（包括外卖订单）
+        # 包厢名称 + 数字匹配（新格式支持）
+        res_keywords = extract_room_keywords(reservation_table)
+        mt_keywords = extract_room_keywords(meituan_table)
         res_numbers = extract_numbers(reservation_table)
         mt_numbers = extract_numbers(meituan_table)
         
+        # 如果包厢关键词和数字都匹配
+        if (res_keywords and mt_keywords and 
+            res_keywords.intersection(mt_keywords) and 
+            res_numbers and mt_numbers and res_numbers == mt_numbers):
+            if is_takeout(meituan_table):
+                return True, "包厢外卖匹配"
+            else:
+                return True, "包厢匹配"
+        
+        # 数字部分匹配（传统匹配方式）
         if res_numbers and mt_numbers and res_numbers == mt_numbers:
             # 区分外卖和堂食的数字匹配
             if is_takeout(meituan_table):
@@ -225,6 +349,9 @@ class ReservationMatcherWeb:
                         try:
                             sheet_df = pd.read_excel(reservation_uploaded, sheet_name=sheet_name)
                             
+                            # 处理新格式的预定表（检测是否为新格式）
+                            sheet_df = self.process_new_format_reservation(sheet_df)
+                            
                             # 清理数据：移除完全空的列和行
                             sheet_df = sheet_df.dropna(how='all', axis=1)  # 删除全空列
                             sheet_df = sheet_df.dropna(how='all', axis=0)  # 删除全空行
@@ -357,14 +484,18 @@ class ReservationMatcherWeb:
                     try:
                         day_df = pd.read_excel(self.reservation_file, sheet_name=sheet_name)
                         
-                        # 检查必要的列是否存在
-                        required_cols = ['姓名', '预订人']
-                        missing_cols = [col for col in required_cols if col not in day_df.columns]
-                        if missing_cols:
+                        # 检查必要的列是否存在（兼容新旧格式）
+                        # 新格式：姓名、预订人
+                        # 旧格式：姓名、预订人 或 客户姓名、预订人
+                        has_name_col = '姓名' in day_df.columns or '客户姓名' in day_df.columns
+                        has_booker_col = '预订人' in day_df.columns
+                        
+                        if not (has_name_col and has_booker_col):
                             continue
                             
-                        # 数据清洗
-                        day_df = day_df[day_df['姓名'].notna() & day_df['预订人'].notna()]
+                        # 数据清洗（兼容新旧格式）
+                        name_col = '姓名' if '姓名' in day_df.columns else '客户姓名'
+                        day_df = day_df[day_df[name_col].notna() & day_df['预订人'].notna()]
                         
                         # 预订人姓名标准化处理
                         def standardize_name(name):
@@ -387,13 +518,19 @@ class ReservationMatcherWeb:
                         
                         day_df['预订人'] = day_df['预订人'].apply(standardize_name)
                         
-                        # 选择和重命名列
-                        available_cols = ['日期', '市别', '包厢', '姓名', '预订人', '经手人']
+                        # 选择和重命名列（兼容新旧格式）
+                        # 新格式可能的列：日期、市别、包厢、姓名、预订人、人数、时间、客户类型
+                        # 旧格式可能的列：日期、市别、包厢、客户姓名、预订人、经手人
+                        available_cols = ['日期', '市别', '包厢', '姓名', '客户姓名', '预订人', '经手人', '人数', '时间', '客户类型']
                         existing_cols = [col for col in available_cols if col in day_df.columns]
                         day_df = day_df[existing_cols].copy()
                         
-                        # 标准化列名
-                        col_mapping = {'包厢': '桌牌号', '姓名': '客户姓名'}
+                        # 标准化列名（统一为旧格式的列名以保持兼容性）
+                        col_mapping = {
+                            '包厢': '桌牌号', 
+                            '姓名': '客户姓名',  # 新格式的姓名映射为客户姓名
+                            '客户姓名': '客户姓名'  # 旧格式保持不变
+                        }
                         day_df.rename(columns=col_mapping, inplace=True)
                         
                         # 处理日期
@@ -463,22 +600,33 @@ class ReservationMatcherWeb:
                 # 如果是单个DataFrame，直接处理
                 day_df = self.reservation_file.copy()
                 
-                # 检查必要的列是否存在
-                required_cols = ['姓名', '预订人']
-                missing_cols = [col for col in required_cols if col not in day_df.columns]
-                if missing_cols:
-                    return False, f"预订文件缺少必要列: {missing_cols}"
+                # 检查必要的列是否存在 - 兼容新旧格式
+                name_col = None
+                if '姓名' in day_df.columns:
+                    name_col = '姓名'
+                elif '客户姓名' in day_df.columns:
+                    name_col = '客户姓名'
+                
+                if name_col is None or '预订人' not in day_df.columns:
+                    return False, f"预订文件缺少必要列: 需要'姓名'或'客户姓名'列以及'预订人'列"
                     
                 # 数据清洗
-                day_df = day_df[day_df['姓名'].notna() & day_df['预订人'].notna()]
+                day_df = day_df[day_df[name_col].notna() & day_df['预订人'].notna()]
                 
-                # 选择和重命名列
-                available_cols = ['日期', '市别', '包厢', '姓名', '预订人', '经手人']
+                # 选择和重命名列 - 兼容新旧格式
+                available_cols = ['日期', '市别', '包厢', '桌牌号', name_col, '预订人', '经手人', '预订时间']
                 existing_cols = [col for col in available_cols if col in day_df.columns]
                 day_df = day_df[existing_cols].copy()
                 
-                # 标准化列名
-                col_mapping = {'包厢': '桌牌号', '姓名': '客户姓名'}
+                # 标准化列名 - 统一映射到旧格式列名
+                col_mapping = {
+                    '包厢': '桌牌号',
+                    '姓名': '客户姓名'  # 新格式的'姓名'映射为'客户姓名'
+                }
+                # 如果已经是'客户姓名'列，则不需要重命名
+                if name_col == '客户姓名':
+                    col_mapping.pop('姓名', None)
+                    
                 day_df.rename(columns=col_mapping, inplace=True)
                 
                 # 处理日期
@@ -494,22 +642,39 @@ class ReservationMatcherWeb:
                     merged_records = []
                     
                     for _, reservation in day_df.iterrows():
-                        # 找到同一日期、桌牌号、市别的所有美团订单（使用下单时间的日期进行匹配）
+                        # 找到同一日期、市别的所有美团订单，然后使用智能桌牌号匹配
                         reservation_date = reservation['日期'].date() if hasattr(reservation['日期'], 'date') else reservation['日期']
-                        matching_orders = mt_df[
+                        
+                        # 先按日期和市别筛选
+                        candidate_orders = mt_df[
                             (mt_df['下单日期'] == reservation_date) &
-                            (mt_df['桌牌号'] == reservation['桌牌号']) &
                             (mt_df['市别'] == reservation['市别'])
                         ].copy()
                         
+                        # 使用智能匹配找到桌牌号匹配的订单
+                        matching_orders = []
+                        match_info = []
+                        
+                        for _, order in candidate_orders.iterrows():
+                            is_match, match_type = self.smart_table_match(
+                                reservation['桌牌号'], 
+                                order['桌牌号']
+                            )
+                            if is_match:
+                                matching_orders.append(order)
+                                match_info.append(match_type)
+                        
+                        matching_orders = pd.DataFrame(matching_orders) if matching_orders else pd.DataFrame()
+                        
                         if not matching_orders.empty:
                             # 为每个匹配的订单创建独立记录
-                            for _, order in matching_orders.iterrows():
+                            for idx, (_, order) in enumerate(matching_orders.iterrows()):
                                 merged_record = reservation.copy()
                                 merged_record['支付合计'] = order['支付合计']
                                 merged_record['下单时间'] = order['下单时间']
                                 merged_record['下单时间_格式化'] = order['下单时间_格式化']
                                 merged_record['结账方式'] = order['结账方式']
+                                merged_record['匹配类型'] = match_info[idx] if idx < len(match_info) else '未知'
                                 merged_records.append(merged_record)
                         else:
                             # 没有匹配的订单
@@ -518,6 +683,7 @@ class ReservationMatcherWeb:
                             merged_record['下单时间'] = None
                             merged_record['下单时间_格式化'] = None
                             merged_record['结账方式'] = None
+                            merged_record['匹配类型'] = '未匹配'
                             merged_records.append(merged_record)
                     
                     if merged_records:
@@ -568,26 +734,42 @@ class ReservationMatcherWeb:
             st.subheader("📊 匹配统计")
             match_stats = self.merged_df['匹配类型'].value_counts()
             
-            col1, col2, col3, col4, col5 = st.columns(5)
+            # 第一行：主要匹配类型
+            col1, col2, col3, col4 = st.columns(4)
             
             with col1:
                 complete_match = match_stats.get('完全匹配', 0)
                 st.metric("完全匹配", complete_match, help="桌牌号完全相同的匹配")
             
             with col2:
-                number_match = match_stats.get('数字匹配', 0)
-                st.metric("数字匹配", number_match, help="桌牌号数字部分相同的堂食匹配")
+                room_match = match_stats.get('包厢匹配', 0)
+                st.metric("包厢匹配", room_match, help="包厢名称和数字都匹配的堂食")
             
             with col3:
-                takeout_match = match_stats.get('外卖匹配', 0)
-                st.metric("外卖匹配", takeout_match, help="预订改为外卖配送的匹配")
+                number_match = match_stats.get('数字匹配', 0)
+                st.metric("数字匹配", number_match, help="桌牌号数字部分相同的堂食匹配")
             
             with col4:
                 no_match = match_stats.get('未匹配', 0)
                 st.metric("未匹配", no_match, help="未找到对应美团订单")
             
-            with col5:
+            # 第二行：外卖匹配类型和总体统计
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                takeout_match = match_stats.get('外卖匹配', 0)
+                st.metric("外卖匹配", takeout_match, help="预订改为外卖配送的匹配")
+            
+            with col2:
+                room_takeout_match = match_stats.get('包厢外卖匹配', 0)
+                st.metric("包厢外卖", room_takeout_match, help="包厢预订改为外卖配送的匹配")
+            
+            with col3:
                 total_records = len(self.merged_df)
+                matched_records = total_records - no_match
+                st.metric("已匹配", matched_records, help="成功匹配的记录总数")
+            
+            with col4:
                 match_rate = round((total_records - no_match) / total_records * 100, 1) if total_records > 0 else 0
                 st.metric("匹配率", f"{match_rate}%", help="成功匹配的记录比例")
             
@@ -754,6 +936,13 @@ class ReservationMatcherWeb:
             
             # 复制美团文件并处理支付合计
             meituan_processed = self.meituan_file.copy()
+            
+            # 应用与自动匹配相同的数据过滤条件
+            if '订单状态' in meituan_processed.columns:
+                meituan_processed = meituan_processed[meituan_processed['订单状态'] == '已结账']
+            if '营业日期' in meituan_processed.columns:
+                meituan_processed = meituan_processed[meituan_processed['营业日期'] != '--']
+            
             if '支付合计' not in meituan_processed.columns and '结账方式' in meituan_processed.columns:
                 meituan_processed['支付合计'] = meituan_processed['结账方式'].apply(extract_payment)
             
@@ -776,6 +965,84 @@ class ReservationMatcherWeb:
             st.write("**📋 可选择的美团订单:**")
             st.write("💡 *点击表格中的行来选择美团订单（支持多选，按住Ctrl键可选择多个）*")
             
+            # 添加调试信息
+            with st.expander("🔍 数据调试信息", expanded=False):
+                st.write("**原始美团数据统计:**")
+                original_count = len(self.meituan_file) if self.meituan_file is not None else 0
+                processed_count = len(meituan_processed)
+                st.write(f"- 原始数据行数: {original_count}")
+                st.write(f"- 过滤后行数: {processed_count}")
+                
+                if '订单状态' in self.meituan_file.columns:
+                    status_counts = self.meituan_file['订单状态'].value_counts()
+                    st.write("**订单状态分布:**")
+                    for status, count in status_counts.items():
+                        st.write(f"- {status}: {count} 个")
+                
+                if '营业日期' in self.meituan_file.columns:
+                    dash_count = (self.meituan_file['营业日期'] == '--').sum()
+                    st.write(f"**营业日期为'--'的记录数:** {dash_count}")
+                
+                # 显示原始数据的日期范围
+                if '下单时间' in self.meituan_file.columns:
+                    try:
+                        original_dates = pd.to_datetime(self.meituan_file['下单时间'], errors='coerce')
+                        original_valid_dates = original_dates.dropna()
+                        if len(original_valid_dates) > 0:
+                            st.write(f"**原始数据日期范围:** {original_valid_dates.min().date()} 到 {original_valid_dates.max().date()}")
+                            
+                            # 按日期统计原始数据
+                            original_date_counts = original_valid_dates.dt.date.value_counts().sort_index()
+                            st.write("**原始数据按日期统计（前10天）:**")
+                            for date, count in original_date_counts.head(10).items():
+                                st.write(f"- {date}: {count} 个订单")
+                    except Exception as e:
+                        st.write(f"原始日期分析错误: {e}")
+            
+            # 添加日期筛选器
+            st.write("**🗓️ 日期筛选:**")
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                # 获取美团订单中的所有日期
+                available_dates = []
+                if '下单时间' in meituan_processed.columns:
+                    try:
+                        meituan_dates = pd.to_datetime(meituan_processed['下单时间'], errors='coerce')
+                        unique_dates = meituan_dates.dt.date.dropna().unique()
+                        available_dates = sorted([d for d in unique_dates if d is not None])
+                    except:
+                        pass
+                
+                if available_dates:
+                    # 默认选择预订记录的日期（如果存在）
+                    default_date = reservation_date if reservation_date in available_dates else available_dates[0]
+                    selected_date = st.selectbox(
+                        "选择要查看的日期",
+                        options=available_dates,
+                        index=available_dates.index(default_date) if default_date in available_dates else 0,
+                        format_func=lambda x: x.strftime('%Y-%m-%d (%A)') if x else 'N/A'
+                    )
+                    
+                    # 根据选择的日期重新筛选美团订单
+                    try:
+                        meituan_dates = pd.to_datetime(meituan_processed['下单时间'], errors='coerce')
+                        related_meituan = meituan_processed[
+                            meituan_dates.dt.date == selected_date
+                        ]
+                    except:
+                        related_meituan = meituan_processed
+                else:
+                    st.info("未找到有效的日期信息")
+                    related_meituan = meituan_processed
+            
+            with col2:
+                # 显示筛选结果统计
+                if not related_meituan.empty:
+                    st.metric("当日美团订单数", len(related_meituan))
+                else:
+                    st.metric("当日美团订单数", 0)
+            
             # 显示美团订单详细信息表格（可选择）
             if not related_meituan.empty:
                 # 选择要显示的核心列（包含日期、时间、金额）
@@ -788,6 +1055,11 @@ class ReservationMatcherWeb:
                     for col in meituan_display.columns:
                         if col == '支付合计':
                             meituan_display[col] = meituan_display[col].apply(lambda x: f"¥{x}" if pd.notna(x) and str(x) != 'nan' else '')
+                        elif col == '下单时间':
+                            # 确保下单时间显示完整的日期时间
+                            meituan_display[col] = meituan_display[col].apply(
+                                lambda x: pd.to_datetime(x).strftime('%Y-%m-%d %H:%M:%S') if pd.notna(x) and x != '' else ''
+                            )
                         else:
                             meituan_display[col] = meituan_display[col].astype(str).replace('nan', '')
                     
