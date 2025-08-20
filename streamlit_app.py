@@ -242,13 +242,28 @@ class ReservationMatcherWeb:
             st.error(f"❌ 移除匹配失败: {str(e)}")
         
     def load_files(self):
-        """文件上传界面"""
-        # 美团订单文件上传
-        st.write("**美团订单文件**")
+        """现代化文件上传界面"""
+        # 美团订单文件上传区域
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1)); 
+                    border-radius: 16px; 
+                    padding: 1.5rem; 
+                    margin-bottom: 1.5rem; 
+                    border: 1px solid rgba(59, 130, 246, 0.2);'>
+            <h4 style='margin: 0 0 1rem 0; color: #3b82f6; font-weight: 600;'>
+                📊 美团订单文件
+            </h4>
+            <p style='margin: 0; color: #64748b; font-size: 0.9rem;'>
+                支持 .xlsx 和 .xls 格式，请确保文件包含营业日期和桌牌号列
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         meituan_uploaded = st.file_uploader(
-            "选择美团订单Excel文件", 
+            "拖拽文件到此处或点击选择美团订单Excel文件", 
             type=['xlsx', 'xls'],
-            key="meituan"
+            key="meituan",
+            help="支持的格式：Excel (.xlsx, .xls)，文件大小限制：200MB"
         )
         
         if meituan_uploaded:
@@ -299,39 +314,113 @@ class ReservationMatcherWeb:
                 if not table_col: missing_cols.append('桌牌号相关列')
                 
                 if missing_cols:
-                    st.error(f"缺少必要列: {', '.join(missing_cols)}")
+                    st.error(f"❌ 缺少必要列: {', '.join(missing_cols)}")
                 else:
-                    st.success(f"✅ 美团文件已加载 ({len(self.meituan_file)} 条记录)")
+                    # 现代化成功提示
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1)); 
+                                border-radius: 12px; 
+                                padding: 1rem 1.5rem; 
+                                border-left: 4px solid #10b981; 
+                                margin: 1rem 0;'>
+                        <div style='display: flex; align-items: center; gap: 0.5rem;'>
+                            <span style='font-size: 1.2rem;'>✅</span>
+                            <strong style='color: #059669;'>美团文件加载成功！</strong>
+                        </div>
+                        <p style='margin: 0.5rem 0 0 0; color: #064e3b; font-size: 0.9rem;'>
+                            已成功加载 <strong>{len(self.meituan_file)}</strong> 条记录，检测到日期列：<strong>{date_col}</strong>，桌牌号列：<strong>{table_col}</strong>
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    with st.expander("预览美团数据", expanded=False):
+                    with st.expander("👀 预览美团数据", expanded=False):
                         # 创建显示用的DataFrame副本
                         display_df = self.meituan_file.copy()
                         
-                        # 添加水平滚动样式
+                        # 现代化表格样式
                         st.markdown("""
                         <style>
                         .stDataFrame {
-                            overflow-x: auto;
+                            background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(248,250,252,0.95));
+                            backdrop-filter: blur(10px);
+                            border-radius: 12px;
+                            overflow: hidden;
+                            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+                            border: 1px solid rgba(226, 232, 240, 0.5);
                         }
                         .stDataFrame > div {
                             overflow-x: auto;
+                            border-radius: 12px;
+                        }
+                        .stDataFrame table {
+                            border-collapse: separate;
+                            border-spacing: 0;
+                        }
+                        .stDataFrame th {
+                            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+                            color: white;
+                            font-weight: 600;
+                            padding: 12px 16px;
+                            border: none;
+                            position: sticky;
+                            top: 0;
+                            z-index: 10;
+                        }
+                        .stDataFrame td {
+                            padding: 10px 16px;
+                            border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+                            transition: background-color 0.2s ease;
+                        }
+                        .stDataFrame tr:hover td {
+                            background-color: rgba(59, 130, 246, 0.05);
                         }
                         </style>
                         """, unsafe_allow_html=True)
                         
-                        st.dataframe(display_df, use_container_width=True)
+                        # 数据统计信息
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("📊 总记录数", len(display_df))
+                        with col2:
+                            st.metric("📅 列数", len(display_df.columns))
+                        with col3:
+                            if date_col and date_col in display_df.columns:
+                                unique_dates = display_df[date_col].nunique()
+                                st.metric("📆 日期范围", unique_dates)
+                        
+                        st.dataframe(display_df, use_container_width=True, height=400)
                     
             except Exception as e:
                 st.error(f"美团文件加载失败: {str(e)}")
             
-            st.divider()
+            # 分隔线美化
+            st.markdown("""
+            <div style='height: 1px; 
+                        background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent); 
+                        margin: 2rem 0;'></div>
+            """, unsafe_allow_html=True)
             
-            # 预订记录文件上传
-            st.write("**预订记录文件**")
+            # 预订记录文件上传区域
+            st.markdown("""
+            <div style='background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1)); 
+                        border-radius: 16px; 
+                        padding: 1.5rem; 
+                        margin-bottom: 1.5rem; 
+                        border: 1px solid rgba(139, 92, 246, 0.2);'>
+                <h4 style='margin: 0 0 1rem 0; color: #8b5cf6; font-weight: 600;'>
+                    📋 预订记录文件
+                </h4>
+                <p style='margin: 0; color: #64748b; font-size: 0.9rem;'>
+                    支持多工作表Excel文件，系统将自动合并所有有效数据
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
             reservation_uploaded = st.file_uploader(
-                "选择预订记录Excel文件", 
+                "拖拽文件到此处或点击选择预订记录Excel文件", 
                 type=['xlsx', 'xls'],
-                key="reservation"
+                key="reservation",
+                help="支持的格式：Excel (.xlsx, .xls)，可包含多个工作表"
             )
             
             if reservation_uploaded:
@@ -375,7 +464,22 @@ class ReservationMatcherWeb:
                             if self.reservation_file[col].dtype == 'object':
                                 self.reservation_file[col] = self.reservation_file[col].astype(str)
                         
-                        st.success(f"✅ 预订文件已加载 ({len(self.reservation_file)} 条记录)")
+                        # 现代化成功提示
+                        st.markdown(f"""
+                        <div style='background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(124, 58, 237, 0.1)); 
+                                    border-radius: 12px; 
+                                    padding: 1rem 1.5rem; 
+                                    border-left: 4px solid #8b5cf6; 
+                                    margin: 1rem 0;'>
+                            <div style='display: flex; align-items: center; gap: 0.5rem;'>
+                                <span style='font-size: 1.2rem;'>✅</span>
+                                <strong style='color: #7c3aed;'>预订文件加载成功！</strong>
+                            </div>
+                            <p style='margin: 0.5rem 0 0 0; color: #581c87; font-size: 0.9rem;'>
+                                已成功处理 <strong>{valid_sheets}</strong> 个工作表，合并 <strong>{len(self.reservation_file)}</strong> 条预订记录
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     else:
                         st.error("没有找到有效数据")
                         self.reservation_file = pd.DataFrame()
@@ -384,19 +488,58 @@ class ReservationMatcherWeb:
                         # 创建显示用的DataFrame副本
                         display_df = self.reservation_file.copy()
                         
-                        # 添加水平滚动样式
+                        # 现代化表格样式（预订数据用紫色主题）
                         st.markdown("""
                         <style>
-                        .stDataFrame {
-                            overflow-x: auto;
+                        .reservation-table .stDataFrame {
+                            background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(248,250,252,0.95));
+                            backdrop-filter: blur(10px);
+                            border-radius: 12px;
+                            overflow: hidden;
+                            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+                            border: 1px solid rgba(139, 92, 246, 0.3);
                         }
-                        .stDataFrame > div {
+                        .reservation-table .stDataFrame > div {
                             overflow-x: auto;
+                            border-radius: 12px;
+                        }
+                        .reservation-table .stDataFrame th {
+                            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                            color: white;
+                            font-weight: 600;
+                            padding: 12px 16px;
+                            border: none;
+                            position: sticky;
+                            top: 0;
+                            z-index: 10;
+                        }
+                        .reservation-table .stDataFrame td {
+                            padding: 10px 16px;
+                            border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+                            transition: background-color 0.2s ease;
+                        }
+                        .reservation-table .stDataFrame tr:hover td {
+                            background-color: rgba(139, 92, 246, 0.05);
                         }
                         </style>
                         """, unsafe_allow_html=True)
                         
-                        st.dataframe(display_df, use_container_width=True)
+                        # 数据统计信息
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("📋 总记录数", len(display_df))
+                        with col2:
+                            st.metric("📊 列数", len(display_df.columns))
+                        with col3:
+                            if '数据来源工作表' in display_df.columns:
+                                unique_sheets = display_df['数据来源工作表'].nunique()
+                                st.metric("📄 工作表数", unique_sheets)
+                        
+                        # 使用容器包装表格以应用特定样式
+                        with st.container():
+                            st.markdown('<div class="reservation-table">', unsafe_allow_html=True)
+                            st.dataframe(display_df, use_container_width=True, height=400)
+                            st.markdown('</div>', unsafe_allow_html=True)
                         
                 except Exception as e:
                     st.error(f"❌ 预订文件加载失败: {str(e)}")
@@ -729,63 +872,180 @@ class ReservationMatcherWeb:
             st.warning("暂无数据")
             return
         
-        # 显示匹配统计信息
+        # 现代化匹配统计信息展示
         if '匹配类型' in self.merged_df.columns:
-            st.subheader("📊 匹配统计")
+            st.markdown("""
+            <div style='background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); 
+                        border-radius: 16px; 
+                        padding: 1.5rem; 
+                        margin: 1rem 0; 
+                        border: 1px solid rgba(99, 102, 241, 0.2);'>
+                <h3 style='color: #4f46e5; margin: 0 0 1rem 0; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;'>
+                    📊 智能匹配统计概览
+                </h3>
+            </div>
+            """, unsafe_allow_html=True)
+            
             match_stats = self.merged_df['匹配类型'].value_counts()
+            
+            # 添加现代化统计卡片的CSS样式
+            st.markdown("""
+            <style>
+            .metric-card {
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.9));
+                border-radius: 12px;
+                padding: 1.2rem;
+                margin: 0.5rem 0;
+                border: 1px solid rgba(226, 232, 240, 0.8);
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                transition: all 0.3s ease;
+                text-align: center;
+            }
+            .metric-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .metric-value {
+                font-size: 2rem;
+                font-weight: 700;
+                margin: 0.5rem 0;
+            }
+            .metric-label {
+                font-size: 0.9rem;
+                color: #64748b;
+                font-weight: 500;
+            }
+            .metric-complete { color: #059669; }
+            .metric-room { color: #0891b2; }
+            .metric-number { color: #7c3aed; }
+            .metric-unmatch { color: #dc2626; }
+            .metric-takeout { color: #ea580c; }
+            .metric-room-takeout { color: #c2410c; }
+            .metric-matched { color: #16a34a; }
+            .metric-rate { color: #2563eb; }
+            </style>
+            """, unsafe_allow_html=True)
             
             # 第一行：主要匹配类型
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
                 complete_match = match_stats.get('完全匹配', 0)
-                st.metric("完全匹配", complete_match, help="桌牌号完全相同的匹配")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-complete'>🎯 {complete_match}</div>
+                    <div class='metric-label'>完全匹配</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>桌牌号完全相同</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col2:
                 room_match = match_stats.get('包厢匹配', 0)
-                st.metric("包厢匹配", room_match, help="包厢名称和数字都匹配的堂食")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-room'>🏠 {room_match}</div>
+                    <div class='metric-label'>包厢匹配</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>包厢名称数字匹配</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col3:
                 number_match = match_stats.get('数字匹配', 0)
-                st.metric("数字匹配", number_match, help="桌牌号数字部分相同的堂食匹配")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-number'>🔢 {number_match}</div>
+                    <div class='metric-label'>数字匹配</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>桌牌号数字相同</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col4:
                 no_match = match_stats.get('未匹配', 0)
-                st.metric("未匹配", no_match, help="未找到对应美团订单")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-unmatch'>❌ {no_match}</div>
+                    <div class='metric-label'>未匹配</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>未找到对应订单</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             # 第二行：外卖匹配类型和总体统计
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
                 takeout_match = match_stats.get('外卖匹配', 0)
-                st.metric("外卖匹配", takeout_match, help="预订改为外卖配送的匹配")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-takeout'>🚚 {takeout_match}</div>
+                    <div class='metric-label'>外卖匹配</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>预订改为外卖</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col2:
                 room_takeout_match = match_stats.get('包厢外卖匹配', 0)
-                st.metric("包厢外卖", room_takeout_match, help="包厢预订改为外卖配送的匹配")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-room-takeout'>🏠🚚 {room_takeout_match}</div>
+                    <div class='metric-label'>包厢外卖</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>包厢改为外卖</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col3:
                 total_records = len(self.merged_df)
                 matched_records = total_records - no_match
-                st.metric("已匹配", matched_records, help="成功匹配的记录总数")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-matched'>✅ {matched_records}</div>
+                    <div class='metric-label'>已匹配总数</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>成功匹配记录</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col4:
                 match_rate = round((total_records - no_match) / total_records * 100, 1) if total_records > 0 else 0
-                st.metric("匹配率", f"{match_rate}%", help="成功匹配的记录比例")
+                st.markdown(f"""
+                <div class='metric-card'>
+                    <div class='metric-value metric-rate'>📈 {match_rate}%</div>
+                    <div class='metric-label'>匹配成功率</div>
+                    <div style='font-size: 0.8rem; color: #94a3b8; margin-top: 0.3rem;'>总体匹配比例</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             st.divider()
         
+        # 现代化筛选和搜索区域
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.8)); 
+                    border-radius: 12px; 
+                    padding: 1.5rem; 
+                    margin: 1rem 0; 
+                    border: 1px solid rgba(226, 232, 240, 0.6);'>
+            <h4 style='color: #475569; margin: 0 0 1rem 0; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;'>
+                🔍 数据筛选与搜索
+            </h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
         col1, col2 = st.columns(2)
         with col1:
+            st.markdown("**📊 显示范围**")
             filter_option = st.selectbox(
-                "显示内容",
-                ["全部记录", "已匹配记录", "未匹配记录"]
+                "选择要显示的数据类型",
+                ["全部记录", "已匹配记录", "未匹配记录"],
+                help="选择要查看的数据范围"
             )
             # 保存筛选条件到session_state
             st.session_state.filter_option = filter_option
         
         with col2:
-            search_keyword = st.text_input("搜索预订人", placeholder="输入预订人姓名进行搜索")
+            st.markdown("**👤 预订人搜索**")
+            search_keyword = st.text_input(
+                "输入预订人姓名", 
+                placeholder="🔍 输入预订人姓名进行精确搜索...",
+                help="支持模糊搜索，输入部分姓名即可"
+            )
             # 保存搜索关键词到session_state
             st.session_state.search_keyword = search_keyword
         
@@ -820,8 +1080,26 @@ class ReservationMatcherWeb:
                     search_condition |= display_df['预订人'].astype(str).str.contains(term, case=False, na=False)
                 display_df = display_df[search_condition]
         
-        # 显示数据表格（简化版）
-        st.subheader(f"📋 数据表格 ({len(display_df)} 条记录)")
+        # 现代化数据表格展示
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1)); 
+                    border-radius: 12px; 
+                    padding: 1.5rem; 
+                    margin: 1rem 0; 
+                    border: 1px solid rgba(59, 130, 246, 0.2);'>
+            <h4 style='color: #3730a3; margin: 0; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;'>
+                📋 智能匹配数据表格 
+                <span style='background: linear-gradient(135deg, #3b82f6, #8b5cf6); 
+                            color: white; 
+                            padding: 0.2rem 0.8rem; 
+                            border-radius: 20px; 
+                            font-size: 0.8rem; 
+                            font-weight: 500;'>
+                    {len(display_df)} 条记录
+                </span>
+            </h4>
+        </div>
+        """, unsafe_allow_html=True)
         
         if not display_df.empty:
             # 配置核心列显示（简化信息）
@@ -835,27 +1113,63 @@ class ReservationMatcherWeb:
             for col in table_df.columns:
                 if col == '匹配状态':
                     table_df[col] = table_df[col].apply(lambda x: '✅已匹配' if str(x) == '已匹配' else '❌未匹配')
+                elif col == '匹配类型':
+                    # 为匹配类型添加图标
+                    type_icons = {
+                        '完全匹配': '🎯完全匹配',
+                        '包厢匹配': '🏠包厢匹配', 
+                        '数字匹配': '🔢数字匹配',
+                        '外卖匹配': '🚚外卖匹配',
+                        '包厢外卖匹配': '🏠🚚包厢外卖',
+                        '未匹配': '❌未匹配'
+                    }
+                    table_df[col] = table_df[col].apply(lambda x: type_icons.get(str(x), str(x)) if pd.notna(x) else '')
                 else:
                     table_df[col] = table_df[col].astype(str).replace('nan', '')
             
             # 重命名列标题使其更简洁
             column_rename = {
-                '日期': '📅日期',
-                '桌牌号': '🪑桌号', 
-                '预订人': '👤预订人',
-                '市别': '🏪市别',
-                '匹配状态': '📊状态'
+                '日期': '📅 日期',
+                '桌牌号': '🪑 桌号', 
+                '预订人': '👤 预订人',
+                '市别': '🏪 市别',
+                '匹配状态': '📊 状态',
+                '匹配类型': '🔍 匹配类型'
             }
             table_df = table_df.rename(columns=column_rename)
             
-            # 添加水平滚动的表格显示
+            # 添加现代化表格样式
             st.markdown("""
             <style>
             .stDataFrame {
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95));
+                border-radius: 12px;
+                padding: 1rem;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                border: 1px solid rgba(226, 232, 240, 0.8);
                 overflow-x: auto;
             }
             .stDataFrame > div {
                 overflow-x: auto;
+                border-radius: 8px;
+            }
+            .stDataFrame table {
+                border-collapse: separate;
+                border-spacing: 0;
+            }
+            .stDataFrame th {
+                background: linear-gradient(135deg, #f8fafc, #e2e8f0) !important;
+                color: #475569 !important;
+                font-weight: 600 !important;
+                padding: 0.75rem !important;
+                border-bottom: 2px solid #cbd5e1 !important;
+            }
+            .stDataFrame td {
+                padding: 0.75rem !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+            }
+            .stDataFrame tr:hover {
+                background-color: rgba(59, 130, 246, 0.05) !important;
             }
             </style>
             """, unsafe_allow_html=True)
@@ -1650,106 +1964,506 @@ def main():
         initial_sidebar_state="collapsed"
     )
     
-    # 简洁现代的CSS样式
+    # 现代化UI设计样式
     st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* CSS变量定义统一配色方案 */
+    :root {
+        --primary-color: #3b82f6;
+        --primary-dark: #2563eb;
+        --secondary-color: #8b5cf6;
+        --secondary-dark: #7c3aed;
+        --accent-color: #10b981;
+        --accent-dark: #059669;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
+        --success-color: #10b981;
+        --info-color: #3b82f6;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --text-muted: #94a3b8;
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #f1f5f9;
+        --border-color: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        --gradient-primary: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        --gradient-secondary: linear-gradient(135deg, #667eea, #764ba2);
+        --gradient-bg: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    
     .main {
         padding: 1rem 2rem;
-        max-width: 1200px;
+        max-width: 1400px;
         margin: 0 auto;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
+    
+    /* 全局背景渐变 */
+    .stApp {
+        background: var(--gradient-bg);
+    }
+    
+    /* 侧边栏美化 */
+    .css-1d391kg {
+        background: var(--gradient-secondary);
+        border-radius: 0 20px 20px 0;
+    }
+    
+    /* 标签页现代化设计 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0;
-        border-bottom: 1px solid #e1e5e9;
-        background: transparent;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 0.5rem;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
     .stTabs [data-baseweb="tab"] {
-        height: 3rem;
+        height: 3.5rem;
         padding: 0 2rem;
         background: transparent;
         border: none;
-        border-bottom: 2px solid transparent;
-        font-weight: 500;
-        color: #64748b;
-        font-size: 14px;
-    }
-    .stTabs [aria-selected="true"] {
-        background: transparent;
-        color: #0f172a;
-        border-bottom-color: #3b82f6;
-    }
-    .stFileUploader {
-        border: 2px dashed #cbd5e1;
-        border-radius: 8px;
-        padding: 2rem;
-        background: #f8fafc;
-        transition: all 0.2s ease;
-    }
-    .stFileUploader:hover {
-        border-color: #3b82f6;
-        background: #f1f5f9;
-    }
-    .metric-container {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin: 0.5rem 0;
-    }
-    .stAlert {
-        border-radius: 8px;
-        border: none;
-    }
-    .stAlert[data-baseweb="notification"][kind="success"] {
-        background: #ecfdf5;
-        color: #059669;
-        border-left: 4px solid #059669;
-    }
-    .stAlert[data-baseweb="notification"][kind="error"] {
-        background: #fef2f2;
-        color: #dc2626;
-        border-left: 4px solid #dc2626;
-    }
-    .stAlert[data-baseweb="notification"][kind="warning"] {
-        background: #fffbeb;
-        color: #d97706;
-        border-left: 4px solid #d97706;
-    }
-    .stAlert[data-baseweb="notification"][kind="info"] {
-        background: #eff6ff;
-        color: #2563eb;
-        border-left: 4px solid #2563eb;
-    }
-    .stDataFrame {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
+        border-radius: 10px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 15px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
         overflow: hidden;
     }
-    h1, h2, h3 {
-        color: #0f172a;
-        font-weight: 600;
+    .stTabs [data-baseweb="tab"]:hover {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--primary-color);
+        transform: translateY(-2px);
     }
+    .stTabs [aria-selected="true"] {
+        background: var(--gradient-primary);
+        color: white;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        transform: translateY(-1px);
+    }
+    .stTabs [aria-selected="true"]::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, rgba(255,255,255,0.1), transparent);
+        pointer-events: none;
+    }
+    /* 文件上传器现代化设计 */
+    .stFileUploader {
+        border: 2px dashed var(--border-color);
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9));
+        backdrop-filter: blur(10px);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    .stFileUploader::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+        transition: left 0.5s;
+    }
+    .stFileUploader:hover {
+        border-color: var(--primary-color);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+        transform: translateY(-2px);
+        box-shadow: 0 10px 40px rgba(59, 130, 246, 0.15);
+    }
+    .stFileUploader:hover::before {
+        left: 100%;
+    }
+    
+    /* 指标容器美化 */
+    .metric-container {
+        background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(248,250,252,0.95));
+        backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        padding: 2rem;
+        margin: 1rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+    .metric-container:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* 警告框现代化 */
+    .stAlert {
+        border-radius: 12px;
+        border: none;
+        backdrop-filter: blur(10px);
+        box-shadow: var(--shadow-md);
+    }
+    .stAlert[data-baseweb="notification"][kind="success"] {
+        background: linear-gradient(135deg, rgba(236, 253, 245, 0.9), rgba(220, 252, 231, 0.9));
+        color: var(--accent-dark);
+        border-left: 4px solid var(--success-color);
+    }
+    .stAlert[data-baseweb="notification"][kind="error"] {
+        background: linear-gradient(135deg, rgba(254, 242, 242, 0.9), rgba(252, 231, 231, 0.9));
+        color: #dc2626;
+        border-left: 4px solid var(--error-color);
+    }
+    .stAlert[data-baseweb="notification"][kind="warning"] {
+        background: linear-gradient(135deg, rgba(255, 251, 235, 0.9), rgba(254, 243, 199, 0.9));
+        color: #d97706;
+        border-left: 4px solid var(--warning-color);
+    }
+    .stAlert[data-baseweb="notification"][kind="info"] {
+        background: linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(219, 234, 254, 0.9));
+        color: var(--primary-dark);
+        border-left: 4px solid var(--info-color);
+    }
+    
+    /* 数据表格美化 */
+    .stDataFrame {
+        border: 1px solid rgba(226, 232, 240, 0.5);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* 标题样式 */
+    h1, h2, h3 {
+        color: var(--text-primary);
+        font-weight: 700;
+        background: var(--gradient-secondary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    /* 按钮现代化设计 */
     .stButton > button {
-        border-radius: 6px;
-        font-weight: 500;
-        transition: all 0.2s ease;
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: none;
+        position: relative;
+        overflow: hidden;
+    }
+    .stButton > button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+    }
+    .stButton > button:hover::before {
+        left: 100%;
     }
     .stButton > button[kind="primary"] {
-        background: #3b82f6;
-        border: none;
+        background: var(--gradient-primary);
+        color: white;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
     }
     .stButton > button[kind="primary"]:hover {
-        background: #2563eb;
-        transform: translateY(-1px);
+        background: linear-gradient(135deg, var(--primary-dark), var(--secondary-dark));
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4);
+    }
+    .stButton > button[kind="secondary"] {
+        background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+        color: var(--text-secondary);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        backdrop-filter: blur(10px);
+    }
+    .stButton > button[kind="secondary"]:hover {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+        transform: translateY(-2px);
+    }
+    
+    /* 进度条美化 */
+    .stProgress > div > div > div {
+        background: var(--gradient-primary);
+        border-radius: 10px;
+    }
+    
+    /* 选择框美化 */
+    .stSelectbox > div > div {
+        border-radius: 12px;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+    }
+    
+    /* 图标样式优化 */
+    .icon-container {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        background: var(--gradient-primary);
+        color: white;
+        font-size: 1.2rem;
+        margin-right: 0.75rem;
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+    }
+    .icon-container:hover {
+        transform: scale(1.1);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    /* 状态徽章样式 */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+    }
+    .status-badge.success {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+        color: var(--success-color);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .status-badge.warning {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1));
+        color: var(--warning-color);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+    .status-badge.error {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1));
+        color: var(--error-color);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .status-badge.info {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.1));
+        color: var(--info-color);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+    
+    /* 响应式设计和移动端适配 */
+    @media (max-width: 768px) {
+        .main {
+            padding: 0.5rem 1rem;
+        }
+        
+        /* 移动端标签页优化 */
+        .stTabs [data-baseweb="tab-list"] {
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            padding: 0.25rem;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 2.5rem;
+            padding: 0 1rem;
+            font-size: 14px;
+            min-width: auto;
+            flex: 1;
+        }
+        
+        /* 移动端文件上传器 */
+        .stFileUploader {
+            padding: 2rem 1rem;
+            margin: 0.5rem 0;
+        }
+        
+        /* 移动端按钮 */
+        .stButton > button {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 14px;
+        }
+        
+        /* 移动端指标容器 */
+        .metric-container {
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+        
+        /* 移动端数据表格 */
+        .stDataFrame {
+            font-size: 12px;
+        }
+        
+        /* 移动端标题 */
+        h1 {
+            font-size: 1.8rem !important;
+        }
+        h2 {
+            font-size: 1.4rem !important;
+        }
+        h3 {
+            font-size: 1.2rem !important;
+        }
+        
+        /* 移动端图标容器 */
+        .icon-container {
+            width: 2rem;
+            height: 2rem;
+            font-size: 1rem;
+            margin-right: 0.5rem;
+        }
+        
+        /* 移动端状态徽章 */
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .main {
+            padding: 0.25rem 0.5rem;
+        }
+        
+        /* 超小屏幕标签页 */
+        .stTabs [data-baseweb="tab"] {
+            height: 2.25rem;
+            padding: 0 0.75rem;
+            font-size: 12px;
+        }
+        
+        /* 超小屏幕文件上传器 */
+        .stFileUploader {
+            padding: 1.5rem 0.75rem;
+        }
+        
+        /* 超小屏幕标题 */
+        h1 {
+            font-size: 1.5rem !important;
+        }
+        h2 {
+            font-size: 1.2rem !important;
+        }
+        h3 {
+            font-size: 1rem !important;
+        }
+        
+        /* 超小屏幕指标容器 */
+        .metric-container {
+            padding: 0.75rem;
+        }
+    }
+    
+    /* 平板端适配 */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        .main {
+            padding: 1rem 1.5rem;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            padding: 0 1.5rem;
+        }
+        
+        .metric-container {
+            padding: 1.5rem;
+        }
+    }
+    
+    /* 大屏幕优化 */
+    @media (min-width: 1400px) {
+        .main {
+            max-width: 1600px;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            padding: 0 2.5rem;
+            height: 4rem;
+            font-size: 16px;
+        }
+        
+        .metric-container {
+            padding: 2.5rem;
+        }
+    }
+    
+    /* 触摸设备优化 */
+    @media (hover: none) and (pointer: coarse) {
+        .stButton > button {
+            min-height: 44px;
+            padding: 0.75rem 1.5rem;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            min-height: 44px;
+        }
+        
+        .icon-container {
+            min-width: 44px;
+            min-height: 44px;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # 简洁的标题
+    # 现代化标题设计
     st.markdown("""
-    <div style='text-align: center; margin-bottom: 2rem;'>
-        <h1 style='color: #0f172a; font-weight: 600; font-size: 2rem; margin: 0;'>鹭府预定匹配工具</h1>
+    <div style='text-align: center; margin-bottom: 3rem; padding: 2rem 0;'>
+        <div style='background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.9)); 
+                    backdrop-filter: blur(15px); 
+                    border-radius: 20px; 
+                    padding: 2rem; 
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.1); 
+                    border: 1px solid rgba(255,255,255,0.2); 
+                    display: inline-block; 
+                    position: relative; 
+                    overflow: hidden;'>
+            <div style='position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+                        background: linear-gradient(45deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1)); 
+                        animation: shimmer 3s ease-in-out infinite;'></div>
+            <h1 style='background: linear-gradient(135deg, #667eea, #764ba2); 
+                       -webkit-background-clip: text; 
+                       -webkit-text-fill-color: transparent; 
+                       background-clip: text; 
+                       font-weight: 800; 
+                       font-size: 2.5rem; 
+                       margin: 0; 
+                       position: relative; 
+                       z-index: 1; 
+                       text-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+                📊 鹭府预定匹配工具 v2.0
+            </h1>
+            <p style='color: #64748b; 
+                      font-size: 1.1rem; 
+                      margin: 0.5rem 0 0 0; 
+                      position: relative; 
+                      z-index: 1; 
+                      font-weight: 500;'>
+                智能数据匹配 • 高效预订管理 • 可视化分析
+            </p>
+        </div>
     </div>
+    <style>
+    @keyframes shimmer {
+        0% { transform: translateX(-100%) rotate(45deg); }
+        50% { transform: translateX(100%) rotate(45deg); }
+        100% { transform: translateX(-100%) rotate(45deg); }
+    }
+    </style>
     """, unsafe_allow_html=True)
     
     # 初始化应用
@@ -1777,19 +2491,136 @@ def main():
             is_valid, message = app.validate_files()
             
             if not is_valid:
-                st.warning(message)
+                # 现代化警告提示
+                st.markdown(f"""
+                <div style='background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1)); 
+                            border-radius: 12px; 
+                            padding: 1rem 1.5rem; 
+                            border-left: 4px solid #f59e0b; 
+                            margin: 1rem 0;'>
+                    <div style='display: flex; align-items: center; gap: 0.5rem;'>
+                        <span style='font-size: 1.2rem;'>⚠️</span>
+                        <strong style='color: #92400e;'>等待文件上传</strong>
+                    </div>
+                    <p style='margin: 0.5rem 0 0 0; color: #78350f; font-size: 0.9rem;'>
+                        {message}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.success("文件已就绪")
+                # 现代化成功提示
+                st.markdown("""
+                <div style='background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1)); 
+                            border-radius: 12px; 
+                            padding: 1rem 1.5rem; 
+                            border-left: 4px solid #10b981; 
+                            margin: 1rem 0;'>
+                    <div style='display: flex; align-items: center; gap: 0.5rem;'>
+                        <span style='font-size: 1.2rem;'>✅</span>
+                        <strong style='color: #059669;'>文件已就绪</strong>
+                    </div>
+                    <p style='margin: 0.5rem 0 0 0; color: #064e3b; font-size: 0.9rem;'>
+                        所有文件已成功加载，可以开始数据匹配
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                if st.button("🚀 开始匹配", type="primary", use_container_width=True):
-                    with st.spinner("匹配中..."):
+                if st.button("🚀 开始智能匹配", type="primary", use_container_width=True):
+                    # 现代化进度指示器
+                    progress_container = st.container()
+                    with progress_container:
+                        st.markdown("""
+                        <div style='background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1)); 
+                                    border-radius: 12px; 
+                                    padding: 1.5rem; 
+                                    margin: 1rem 0; 
+                                    text-align: center;'>
+                            <div style='color: #3b82f6; font-weight: 600; margin-bottom: 1rem;'>
+                                🔄 正在进行智能数据匹配...
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # 进度条
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        # 模拟匹配过程的进度更新
+                        import time
+                        
+                        status_text.text("📊 正在分析美团数据...")
+                        progress_bar.progress(20)
+                        time.sleep(0.5)
+                        
+                        status_text.text("📋 正在处理预订记录...")
+                        progress_bar.progress(40)
+                        time.sleep(0.5)
+                        
+                        status_text.text("🔍 正在执行智能匹配算法...")
+                        progress_bar.progress(70)
+                        time.sleep(0.5)
+                        
+                        status_text.text("✨ 正在生成匹配结果...")
+                        progress_bar.progress(90)
+                        
+                        # 执行实际匹配
                         success, result_message = app.match_data()
                         
+                        progress_bar.progress(100)
+                        status_text.text("🎉 匹配完成！")
+                        time.sleep(0.5)
+                        
+                        # 清除进度指示器
+                        progress_container.empty()
+                        
                     if success:
-                        st.success(result_message)
-                        st.info("请切换到'结果查看'标签页")
+                        # 现代化成功提示
+                        st.markdown(f"""
+                        <div style='background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1)); 
+                                    border-radius: 12px; 
+                                    padding: 1rem 1.5rem; 
+                                    border-left: 4px solid #10b981; 
+                                    margin: 1rem 0;'>
+                            <div style='display: flex; align-items: center; gap: 0.5rem;'>
+                                <span style='font-size: 1.2rem;'>🎉</span>
+                                <strong style='color: #059669;'>匹配成功完成！</strong>
+                            </div>
+                            <p style='margin: 0.5rem 0 0 0; color: #064e3b; font-size: 0.9rem;'>
+                                {result_message}
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # 导航提示
+                        st.markdown("""
+                        <div style='background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1)); 
+                                    border-radius: 12px; 
+                                    padding: 1rem 1.5rem; 
+                                    border-left: 4px solid #3b82f6; 
+                                    margin: 1rem 0; 
+                                    text-align: center;'>
+                            <p style='margin: 0; color: #1e40af; font-weight: 500;'>
+                                💡 请切换到 <strong>"📊 结果查看"</strong> 标签页查看匹配结果
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
                     else:
-                        st.error(result_message)
+                        # 现代化错误提示
+                        st.markdown(f"""
+                        <div style='background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1)); 
+                                    border-radius: 12px; 
+                                    padding: 1rem 1.5rem; 
+                                    border-left: 4px solid #ef4444; 
+                                    margin: 1rem 0;'>
+                            <div style='display: flex; align-items: center; gap: 0.5rem;'>
+                                <span style='font-size: 1.2rem;'>❌</span>
+                                <strong style='color: #dc2626;'>匹配失败</strong>
+                            </div>
+                            <p style='margin: 0.5rem 0 0 0; color: #7f1d1d; font-size: 0.9rem;'>
+                                {result_message}
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
     
     with tab2:
         # 查看结果和导出合并
@@ -1799,7 +2630,21 @@ def main():
             app.display_results()
             
         with col2:
-            st.subheader("📥 导出")
+            # 现代化导出区域
+            st.markdown("""
+            <div style='background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(22, 163, 74, 0.1)); 
+                        border-radius: 12px; 
+                        padding: 1.5rem; 
+                        margin: 1rem 0; 
+                        border: 1px solid rgba(34, 197, 94, 0.2);'>
+                <h4 style='color: #15803d; margin: 0 0 1rem 0; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;'>
+                    📥 数据导出中心
+                </h4>
+                <p style='color: #166534; font-size: 0.9rem; margin: 0;'>
+                    将匹配结果导出为Excel文件，便于后续处理和分析
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
             app.export_results()
     
     with tab3:
